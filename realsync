@@ -30,16 +30,16 @@ my @SSH_OPTIONS = (
     "-o", "ConnectTimeout=3",
     "-o", "ServerAliveInterval=2",
     "-o", "ServerAliveCountMax=4",
-    "-o", "StrictHostKeyChecking=no",
+    # "-o", "StrictHostKeyChecking=no",
 );
 my @RSYNC_OPTIONS = (
-    "-rltzxv",
+    "-rltzv", #x
     "--delete",
 );
 my @RSYNC_WRAPPER = ();
 my @RSYNC_SSH_WRAPPER = ();
 my $REALSYNC_SPEC_FILE = ".realsync";
-my @DEFAULT_EXCLUDE = ($REALSYNC_SPEC_FILE, "CVS", ".git", ".svn", ".hg", ".cache", ".idea", "nbproject", "~*", "*.tmp", "*.pyc", "*.swp");
+my @DEFAULT_EXCLUDE = ($REALSYNC_SPEC_FILE, 'adm/htdocs/common', 'www/htdocs/ws', 'www/htdocs/common', 'www/htdocs/simplesaml', 'test/htdocs/common', 'Form');
 
 # Globals.
 my %CONFIG;
@@ -441,20 +441,20 @@ sub do_install {
         # system() is better than popen(), because Perl does not flush a child
         # process'es STDERR till we read from STDIN (Win32 perl bug?).
         print "Copying SSH key to $user\@$host. Executing:\n";
-        my $cmd = "ssh"
-            . " -o StrictHostKeyChecking=no -p$h_port $user\@$h_host\n"
-            . ' "cd; umask 077; test -d .ssh && chmod 700 .ssh || mkdir .ssh;'
-            . ' test -e .ssh/authorized_keys && chmod 600 .ssh/authorized_keys; (echo; cat)'
-            . ' >> .ssh/authorized_keys"';
-        my $show = '$ ' . $cmd;
-        print "$show\n";
-        $cmd =~ s/\s*\n\s*/ /sg;
-        if (system("$cmd < $pub_file")) {
-            print STDERR "\n";
-            print STDERR "Failed connecting to $user\@$host. Please enter a correct host, login and password.\n";
-            print STDERR "\n";
-            next;
-        }
+        # my $cmd = "ssh"
+            # . " -o StrictHostKeyChecking=no -p$h_port $user\@$h_host\n"
+            # . ' "cd; umask 077; test -d .ssh && chmod 700 .ssh || mkdir .ssh;'
+            # . ' test -e .ssh/authorized_keys && chmod 600 .ssh/authorized_keys; (echo; cat)'
+            # . ' >> .ssh/authorized_keys"';
+        # my $show = '$ ' . $cmd;
+        # print "$show\n";
+        # $cmd =~ s/\s*\n\s*/ /sg;
+        # if (system("$cmd < $pub_file")) {
+            # print STDERR "\n";
+            # print STDERR "Failed connecting to $user\@$host. Please enter a correct host, login and password.\n";
+            # print STDERR "\n";
+            # next;
+        # }
         print "Public key $pub_file is copied to $user\@$host!\n";
         print "\n";
         # Successfully copied, so rename the file back.
@@ -489,7 +489,22 @@ sub do_install {
     }
 
     if (!defined $CONFIG{exclude}) {
-        print "\n";
+		my $GIT_FILE = getcwd()."/.gitignore";
+		
+		if (-e $GIT_FILE) {
+			open(local *gitignore, $GIT_FILE);
+
+			while (my $read= <gitignore>) {
+				if($read !~ m/^#/g && $read !~ /^$/) {
+					chomp($read);
+					push(@DEFAULT_EXCLUDE, $read);
+				}
+			}
+			close(gitignore);
+		} else {
+			die("Cannot read \"$GIT_FILE\"\n");
+		}
+		
         my $excludes = ask(
             $step_text->(
                 "Exclusions from " . basename($FILE_CONFIG) . " configuration are:\n" .
@@ -498,6 +513,9 @@ sub do_install {
             ),
             ""
         );
+		
+		 
+		
         my $first = 1;
         foreach my $mask (@DEFAULT_EXCLUDE, grep { length } split(m/[\s+,]+/s, $excludes)) {
             push @config, {
@@ -1266,10 +1284,11 @@ sub init_env {
     $ENV{TMPDIR} = $DIR_PRIVATE;
 
     # Default Linux permissions used by mkdir and cat:
-    # dir:  rwxrwxr-x
+    # dir:  rwxrwxrwx
     # file: rw-rw-r--
     push @RSYNC_OPTIONS, (
-        "--perms=off", "--chmod=ug=rwX,o=rX",
+        "--perms=off", 
+		"--chmod=ugo=rwX",
     );
 }
 
